@@ -1,1 +1,0 @@
-enum PolyhedronType{tetrahedron, cube, octahedron, icosahedron, dodecahedron}

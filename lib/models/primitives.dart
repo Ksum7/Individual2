@@ -1,10 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:graphics_lab6/models/matrix.dart';
 import 'package:image/image.dart';
+import 'package:graphics_lab6/models/ray_model.dart';
 
 abstract interface class IPoints {
   List<Point3D> get points;
@@ -77,6 +75,12 @@ class Point3D {
     return sqrt(x * x + y * y + z * z);
   }
 
+  void limitTop(double value) {
+    x = min(x, value);
+    y = min(y, value);
+    z = min(z, value);
+  }
+
   @override
   String toString() {
     return '${x.toStringAsFixed(2)} ${y.toStringAsFixed(2)} ${z.toStringAsFixed(2)}';
@@ -140,6 +144,36 @@ class Polygon implements IPoints {
       sum = sum + point;
     }
     return sum / points.length;
+  }
+
+  Point3D? intersect(Ray ray) {
+    var e1 = points[1] - points[0];
+    var e2 = points[2] - points[0];
+    var pVec = ray.direction.cross(e2);
+    double det = e1.dot(pVec);
+    if (det.abs() < 1e-18) {
+      return null;
+    }
+
+    double invDet = 1.0 / det;
+    var tVec = ray.start - points[0];
+    double u = tVec.dot(pVec) * invDet;
+    if (u < 0.0 || u > 1.0) {
+      return null;
+    }
+
+    var q = tVec.cross(e1);
+    double v = invDet * (ray.direction.dot(q));
+    if (v < 0.0 || u + v > 1.0) {
+      return null;
+    }
+
+    double t = invDet * (e2.dot(q));
+    if (t > 1e-18) {
+      return ray.start + ray.direction * t;
+    }
+
+    return null;
   }
 }
 
@@ -342,92 +376,5 @@ class Model implements IPoints {
       triangles.add([indices[0], indices[i], indices[i + 1]]);
     }
     return triangles;
-  }
-
-  Future<bool> saveFile() async {
-    var path = await FilePicker.platform.saveFile(
-      type: FileType.custom,
-      allowedExtensions: ['obj'],
-    );
-    if (path == null) {
-      return false;
-    }
-    final buffer = StringBuffer();
-    for (var point in points) {
-      buffer.write(
-          "v ${point.x.toStringAsFixed(9)} ${point.y.toStringAsFixed(9)} ${point.z.toStringAsFixed(9)}\n");
-    }
-    buffer.writeln();
-    for (var polygonIndexes in polygonsByIndexes) {
-      buffer.write("f ");
-      var idcs = [polygonIndexes[0], polygonIndexes[2], polygonIndexes[1]];
-      for (var index in idcs) {
-        buffer.write("${index + 1} ");
-      }
-      buffer.write("\n");
-    }
-    if (!path.endsWith(".obj")) {
-      path = "$path.obj";
-    }
-    await File(path).writeAsString(buffer.toString());
-    return true;
-  }
-
-  static final _doubleRE = RegExp(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?");
-
-  static final RegExp _objVertexRE = RegExp(
-    "v (?<x>${_doubleRE.pattern}) (?<y>${_doubleRE.pattern}) (?<z>${_doubleRE.pattern})( ${_doubleRE.pattern})?\\D",
-  );
-
-  static final _intSlashRE = RegExp(r"([0-9]+)(/[0-9]*)?(/[0-9]+)?");
-
-  static final RegExp _objFaceRE = RegExp(
-    "f (${_intSlashRE.pattern} )*(${_intSlashRE.pattern})\\D",
-  );
-
-  static Future<Model?> fromFile() async {
-    final pick = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['obj'],
-      withData: true,
-    );
-
-    if (pick == null || !pick.isSinglePick) {
-      return null;
-    }
-
-    String fileContent = utf8.decode(pick.files.first.bytes!);
-    final points = List<Point3D>.empty(growable: true);
-    final polygonsByIndexes = List<List<int>>.empty(growable: true);
-
-    // print("points ${_objVertexRE.allMatches(fileContent).length}");
-    for (RegExpMatch match in _objVertexRE.allMatches(fileContent)) {
-      points.add(
-        Point3D(
-          double.parse(match.namedGroup("x")!),
-          double.parse(match.namedGroup("y")!),
-          double.parse(match.namedGroup("z")!),
-        ),
-      );
-
-      // print("point ${match.namedGroup("x")!} ${match.namedGroup("y")!} ${match.namedGroup("z")!}");
-    }
-
-    // print("faces ${_objFaceRE.allMatches(fileContent).length}");
-    for (RegExpMatch match in _objFaceRE.allMatches(fileContent)) {
-      var polygon = List<int>.empty(growable: true);
-      // print(match.group(0)!);
-      for (RegExpMatch m in _intSlashRE.allMatches(match.group(0)!)) {
-        polygon.add(int.parse(m.group(1)!) - 1);
-      }
-      int t = polygon[1];
-      polygon[1] = polygon[2];
-      polygon[2] = t;
-      polygonsByIndexes.add(polygon);
-      // print("polygon $polygon");
-    }
-
-    //return points;
-    return Model(points, polygonsByIndexes);
   }
 }

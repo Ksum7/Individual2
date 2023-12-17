@@ -1,1 +1,0 @@
-enum ProjectionType{trimetric, dimetric, isometric, perspective1, perspective2, perspective3}
