@@ -32,5 +32,6 @@ class CameraMoveEvent extends MainEvent {
 
 class SwitchModeEvent extends MainEvent {
   final bool isLines;
-  const SwitchModeEvent(this.isLines);
+  final List<Configuration> configurations;
+  const SwitchModeEvent(this.isLines, this.configurations);
 }

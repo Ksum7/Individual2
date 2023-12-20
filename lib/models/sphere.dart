@@ -1,44 +1,52 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:graphics_lab6/models/ray_camera.dart';
+import 'package:graphics_lab6/models/camera.dart';
 import 'package:graphics_lab6/models/matrix.dart';
 import 'package:graphics_lab6/models/primitives.dart';
-import 'package:graphics_lab6/models/ray_model.dart';
+import 'package:graphics_lab6/models/model.dart';
 
-class Sphere implements IObject {
+class Sphere extends Model {
+  @override
   final Point3D center;
   final double radius;
-  final Color color;
-  @override
-  final double specularStrength;
-  @override
-  final double shininess;
-  @override
-  final double reflectivity;
-  @override
-  final double transparency;
-  @override
-  final double refractiveIndex;
 
-  Sphere(
-      {required this.color,
-      required this.radius,
-      required this.center,
-      this.shininess = 8,
-      this.specularStrength = 0.5,
-      this.reflectivity = 0.0,
-      this.transparency = 0.0,
-      this.refractiveIndex = 1.03});
+  Sphere({
+    required super.color,
+    required this.radius,
+    required this.center,
+    super.reflectivity = 0.0,
+    super.transparency = 0.0,
+    super.refractiveIndex = 1.03,
+    required super.points,
+    required super.polygonsByIndexes,
+  });
 
-  @override
-  Point3D get objectColor =>
-      Point3D(color.red / 255, color.green / 255, color.blue / 255, 1.0);
+  static Sphere create(
+      {required color,
+      required radius,
+      required center,
+      reflectivity = 0.0,
+      transparency = 0.0,
+      refractiveIndex = 1.03}) {
+    var model = Model.icosahedron(color: color)
+        .getTransformed(Matrix.scaling(Point3D(radius, radius, radius)))
+        .getTransformed(Matrix.translation(center));
+
+    return Sphere(
+        color: color,
+        radius: radius,
+        center: center,
+        reflectivity: reflectivity,
+        transparency: transparency,
+        points: model.points,
+        polygonsByIndexes: model.polygonsByIndexes);
+  }
 
   @override
   Intersection? intersect(
       {required Ray ray,
-      required RayCamera camera,
+      required Camera camera,
       required Matrix view,
       required Matrix projection}) {
     Point3D oc = ray.start - center;
@@ -60,7 +68,7 @@ class Sphere implements IObject {
             inside: ray.direction.dot(normal) > 0,
             normal: normal,
             hit: intersection,
-            z: (intersection - ray.start).length());
+            depth: (intersection - ray.start).length());
       } else {
         return null;
       }

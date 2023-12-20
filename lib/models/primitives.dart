@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:graphics_lab6/models/matrix.dart';
 import 'package:image/image.dart';
-import 'package:graphics_lab6/models/ray_model.dart';
+import 'package:graphics_lab6/models/model.dart';
 
 abstract interface class IPoints {
   List<Point3D> get points;
@@ -11,9 +11,6 @@ abstract interface class IPoints {
 class Point3D {
   double x, y, z;
   double h;
-
-  static get comparator => (Point3D a, Point3D b) =>
-      "${a.x}${a.y}${a.z}".compareTo("${a.x}${a.y}${a.z}");
 
   Point3D(this.x, this.y, this.z, [this.h = 1]);
 
@@ -49,6 +46,10 @@ class Point3D {
 
   double dot(Point3D other) {
     return x * other.x + y * other.y + z * other.z;
+  }
+
+  Point3D multiply(Point3D other) {
+    return Point3D(x * other.x, y * other.y, z * other.z);
   }
 
   Point3D operator *(double value) {
@@ -133,7 +134,7 @@ class Polygon implements IPoints {
 
     var v1 = points[1] - points[0];
     var v2 = points[2] - points[0];
-    return v1.cross(v2);
+    return v1.cross(v2).normalized();
   }
 
   Point3D get center {
@@ -169,212 +170,10 @@ class Polygon implements IPoints {
     }
 
     double t = invDet * (e2.dot(q));
-    if (t > 1e-18) {
-      return ray.start + ray.direction * t;
+    if (t <= 1e-18) {
+      return null;
     }
 
-    return null;
-  }
-}
-
-class Model implements IPoints {
-  final List<Polygon> polygons;
-  Image? texture;
-  @override
-  final List<Point3D> points;
-  final List<List<int>> polygonsByIndexes;
-
-  Model(this.points, this.polygonsByIndexes, {this.texture}) : polygons = [] {
-    for (var polygonIndexes in polygonsByIndexes) {
-      polygons.add(Polygon(List.generate(
-          polygonIndexes.length, (i) => points[polygonIndexes[i]])));
-    }
-  }
-
-  Point3D get center {
-    var sum = Point3D.zero();
-    for (var point in points) {
-      sum = sum + point;
-    }
-    return sum / points.length;
-  }
-
-  Model getTransformed(Matrix transform) {
-    final res = copy();
-    for (var point in res.points) {
-      point.updateWithVector(Matrix.point(point) * transform);
-    }
-    return res;
-  }
-
-  Model copy() {
-    return Model(List.generate(points.length, (index) => points[index].copy()),
-        polygonsByIndexes,
-        texture: texture);
-  }
-
-  Model concat(Model other) {
-    List<Point3D> resPoints = [];
-    List<List<int>> resIndexes = [];
-
-    for (var p in points) {
-      resPoints.add(p.copy());
-    }
-    for (var p in other.points) {
-      resPoints.add(p.copy());
-    }
-
-    for (var pol in polygonsByIndexes) {
-      resIndexes.add(List.from(pol));
-    }
-    int len = points.length;
-    for (var pol in other.polygonsByIndexes) {
-      resIndexes.add(pol.map((e) => e + len).toList());
-    }
-
-    return Model(resPoints, resIndexes);
-  }
-
-  static Model get cube => Model([
-        Point3D(1, 0, 0),
-        Point3D(1, 1, 0),
-        Point3D(0, 1, 0),
-        Point3D(0, 0, 0),
-        Point3D(0, 0, 1),
-        Point3D(0, 1, 1),
-        Point3D(1, 1, 1),
-        Point3D(1, 0, 1),
-      ], [
-        [0, 1, 2],
-        [2, 3, 0],
-        [5, 2, 1],
-        [1, 6, 5],
-        [4, 5, 6],
-        [6, 7, 4],
-        [3, 4, 7],
-        [7, 0, 3],
-        [7, 6, 1],
-        [1, 0, 7],
-        [3, 2, 5],
-        [5, 4, 3],
-      ]);
-
-  static get tetrahedron => Model([
-        Point3D(1, 0, 0),
-        Point3D(0, 0, 1),
-        Point3D(0, 1, 0),
-        Point3D(1, 1, 1),
-      ], [
-        [0, 2, 1],
-        [1, 2, 3],
-        [0, 3, 2],
-        [0, 1, 3]
-      ]);
-
-  static get octahedron => Model([
-        Point3D(0.5, 1, 0.5),
-        Point3D(0.5, 0.5, 1),
-        Point3D(0, 0.5, 0.5),
-        Point3D(0.5, 0.5, 0),
-        Point3D(1, 0.5, 0.5),
-        Point3D(0.5, 0, 0.5),
-      ], [
-        [0, 4, 1],
-        [0, 3, 4],
-        [0, 2, 3],
-        [0, 1, 2],
-        [5, 1, 4],
-        [5, 4, 3],
-        [5, 3, 2],
-        [5, 2, 1],
-      ]);
-
-  static double phi = (1 + sqrt(5)) / 2;
-
-  static get icosahedron => Model(
-          [
-            Point3D(0, phi, 1), // 0
-            Point3D(0, phi, -1), // 1
-            Point3D(phi, 1, 0), // 2
-            Point3D(-phi, 1, 0), // 3
-            Point3D(1, 0, phi), // 4
-            Point3D(1, 0, -phi), // 5
-            Point3D(-1, 0, phi), // 6
-            Point3D(-1, 0, -phi), // 7
-            Point3D(phi, -1, 0), // 8
-            Point3D(-phi, -1, 0), // 9
-            Point3D(0, -phi, 1), // 10
-            Point3D(0, -phi, -1), // 11
-          ].map((e) => e / phi).toList(),
-          [
-            [0, 1, 2],
-            [0, 3, 1],
-            [0, 2, 4],
-            [0, 6, 3],
-            [0, 4, 6],
-            [1, 5, 2],
-            [1, 3, 7],
-            [1, 7, 5],
-            [2, 8, 4],
-            [2, 5, 8],
-            [3, 6, 9],
-            [3, 9, 7],
-            [4, 10, 6],
-            [4, 8, 10],
-            [5, 7, 11],
-            [5, 11, 8],
-            [6, 10, 9],
-            [7, 9, 11],
-            [8, 11, 10],
-            [9, 10, 11],
-          ]);
-
-  static get dodecahedron {
-    final double iphi = 1 / phi;
-    return Model(
-        [
-          Point3D(1, 1, 1), // 0
-          Point3D(1, 1, -1), // 1
-          Point3D(1, -1, 1), // 2
-          Point3D(1, -1, -1), // 3
-          Point3D(-1, 1, 1), // 4
-          Point3D(-1, 1, -1), // 5
-          Point3D(-1, -1, 1), // 6
-          Point3D(-1, -1, -1), // 7
-          Point3D(0, phi, iphi), // 8
-          Point3D(0, phi, -iphi), // 9
-          Point3D(0, -phi, iphi), // 10
-          Point3D(0, -phi, -iphi), // 11
-          Point3D(iphi, 0, phi), // 12
-          Point3D(-iphi, 0, phi), // 13
-          Point3D(iphi, 0, -phi), // 14
-          Point3D(-iphi, 0, -phi), // 15
-          Point3D(phi, iphi, 0), // 16
-          Point3D(phi, -iphi, 0), // 17
-          Point3D(-phi, iphi, 0), // 18
-          Point3D(-phi, -iphi, 0), // 19
-        ].map((e) => e / phi).toList(),
-        [
-          ..._splitIntoTriangles([8, 9, 1, 16, 0]),
-          ..._splitIntoTriangles([4, 18, 5, 9, 8]),
-          ..._splitIntoTriangles([2, 17, 3, 11, 10]),
-          ..._splitIntoTriangles([10, 11, 7, 19, 6]),
-          ..._splitIntoTriangles([12, 13, 4, 8, 0]),
-          ..._splitIntoTriangles([2, 10, 6, 13, 12]),
-          ..._splitIntoTriangles([1, 9, 5, 15, 14]),
-          ..._splitIntoTriangles([14, 15, 7, 11, 3]),
-          ..._splitIntoTriangles([16, 17, 2, 12, 0]),
-          ..._splitIntoTriangles([1, 14, 3, 17, 16]),
-          ..._splitIntoTriangles([4, 13, 6, 19, 18]),
-          ..._splitIntoTriangles([18, 19, 7, 15, 5]),
-        ]);
-  }
-
-  static List<List<int>> _splitIntoTriangles(List<int> indices) {
-    List<List<int>> triangles = [];
-    for (int i = 1; i < indices.length - 1; i++) {
-      triangles.add([indices[0], indices[i], indices[i + 1]]);
-    }
-    return triangles;
+    return ray.start + ray.direction * t;
   }
 }

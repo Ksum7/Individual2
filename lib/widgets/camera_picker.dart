@@ -22,7 +22,7 @@ class _CameraPickerState extends State<CameraPicker> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final camera = (context.watch<MainBloc>().state as MoveState).camera;
+    final camera = context.watch<MainBloc>().state.camera;
     _posController.text =
         "${camera.eye.x.toStringAsFixed(2)} ${camera.eye.y.toStringAsFixed(2)} ${camera.eye.z.toStringAsFixed(2)}";
     _viewPointController.text =
